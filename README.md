@@ -217,7 +217,8 @@ result = scale_similarity(
 )
 ```
 
-Install a PyTorch build appropriate for your hardware before enabling GPU acceleration.
+PyTorch is installed as a package dependency. GPU acceleration can be enabled
+when the installed PyTorch build supports the corresponding CUDA or MPS device.
 
 ---
 
