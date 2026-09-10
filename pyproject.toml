@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdd-sva"
+version = "0.1.0"
+description = "CDD Scale-Vector Alignment: scale-aware morphological similarity for multiscale intensity fields"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Mengke Zhao"},
+  {name = "Guang-Xing Li"},
+  {name = "Keping Qiu"},
+  {name = "Shanghuo Li"}
+]
+keywords = [
+  "astronomy",
+  "image-analysis",
+  "multiscale",
+  "morphology",
+  "similarity",
+  "constrained-diffusion",
+  "scale-space"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Topic :: Scientific/Engineering :: Image Processing",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+]
+dependencies = [
+  "numpy>=1.23",
+  "constrained-diffusion>=1.2.5"
+]
+
+[project.optional-dependencies]
+examples = [
+  "astropy>=5.0",
+  "matplotlib>=3.6",
+  "jupyter>=1.0"
+]
+dev = [
+  "pytest>=7",
+  "build>=1.2",
+  "twine>=5"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
