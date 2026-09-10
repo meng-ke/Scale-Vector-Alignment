@@ -56,3 +56,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[project.urls]
+Homepage = "https://github.com/meng-ke/Scale-Vector-Alignment"
+Repository = "https://github.com/meng-ke/Scale-Vector-Alignment"
+Issues = "https://github.com/meng-ke/Scale-Vector-Alignment/issues"
