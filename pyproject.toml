@@ -34,8 +34,9 @@ classifiers = [
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
 ]
 dependencies = [
-  "numpy>=1.23",
-  "constrained-diffusion>=1.2.5"
+    "numpy>=1.23",
+    "torch",
+    "constrained-diffusion>=1.2.5"
 ]
 
 [project.optional-dependencies]
@@ -61,9 +62,3 @@ addopts = "-ra"
 Homepage = "https://github.com/meng-ke/Scale-Vector-Alignment"
 Repository = "https://github.com/meng-ke/Scale-Vector-Alignment"
 Issues = "https://github.com/meng-ke/Scale-Vector-Alignment/issues"
-
-dependencies = [
-    "numpy>=1.23",
-    "torch",
-    "constrained-diffusion>=1.2.5"
-]
