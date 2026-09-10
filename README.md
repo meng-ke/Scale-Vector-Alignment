@@ -1,101 +1,80 @@
-# CDD-SVA
+# Scale-Vector Alignment (SVA)
 
-**CDD Scale-Vector Alignment (SVA)** is a scale-aware similarity method for
-comparing two matched multiscale intensity fields.
+**Scale-Vector Alignment (SVA)** is a CDD-based, scale-aware method for measuring morphological similarity between multiscale astronomical intensity fields.
 
-SVA uses
-[Constrained Diffusion Decomposition (CDD)](https://github.com/gxli/Constrained-Diffusion-Decomposition)
-to represent the local distribution of image intensity across spatial scale as
-a vector. Morphological similarity is then measured through alignment of the
-two scale vectors.
+SVA uses **Constrained Diffusion Decomposition (CDD)** to represent, at each image position, how intensity is distributed across spatial scale. The local CDD amplitudes form a **scale vector**, and morphological similarity is measured through the alignment of scale vectors.
 
-The package returns four quantities:
+The package provides:
 
-- `S_pix`: pixel-wise similarity, locating where two images share multiscale structure.
-- `S_crit`: empirical reference threshold from spatially shifted null realizations.
-- `scales`: CDD spatial scales in pixels.
-- `S_scale`: scale-wise similarity, showing at which spatial scales the component maps agree.
+- `S_pix`: pixel-wise similarity, showing **where** two images share multiscale structure.
+- `S_crit`: an empirical reference threshold from spatially shifted null realizations.
+- `S_scale`: scale-wise similarity, showing **at which spatial scales** the two images are most similar.
+- `scales`: the CDD spatial scales corresponding to `S_scale`.
 
-## Scope
+The method is designed primarily for **extended intensity fields with meaningful multiscale spatial structure**, such as molecular-line, dust-continuum, column-density, infrared, and optical-emission maps. Sparse unresolved point-source fields are not the primary use case unless they are first represented as a physically meaningful continuous intensity or source-density field.
 
-CDD-SVA is designed primarily for **extended intensity fields with meaningful
-multiscale spatial structure**, such as molecular-line, continuum, column-density,
-infrared, or optical-emission maps.
-
-Sparse unresolved point-source fields are not the primary use case because most
-of their information is carried by isolated sources rather than extended
-multiscale structure. Such data can still be studied after conversion to a
-continuous intensity or source-density representation when that representation
-is physically appropriate.
-
-Before comparison, the two input images should be placed on the **same pixel
-grid and sky projection and matched to the same effective angular resolution**.
+---
 
 ## Installation
 
-After cloning the repository:
+### Install directly from GitHub
 
 ```bash
-cd CDD-SVA
+pip install git+https://github.com/meng-ke/Scale-Vector-Alignment.git
+```
+
+### Clone and install locally
+
+```bash
+git clone https://github.com/meng-ke/Scale-Vector-Alignment.git
+cd Scale-Vector-Alignment
 pip install .
 ```
 
-After a PyPI release, installation will be:
+### Development installation
+
+For development, testing, and the example notebook:
+
+```bash
+git clone https://github.com/meng-ke/Scale-Vector-Alignment.git
+cd Scale-Vector-Alignment
+pip install -e ".[examples,dev]"
+```
+
+Once the package is released on PyPI, installation will simply be:
 
 ```bash
 pip install cdd-sva
 ```
 
-For development and the example notebook:
+CDD-SVA depends on the `constrained-diffusion` package, which is installed automatically.
 
-```bash
-pip install -e ".[examples,dev]"
-```
-
-CDD-SVA depends on the `constrained-diffusion` package, which is installed
-automatically.
-
-### GPU acceleration
-
-CDD supports CUDA and Apple Silicon MPS through PyTorch. Install the appropriate
-PyTorch build for your system, then use:
-
-```python
-result = scale_similarity(I1, I2, use_gpu=True)
-```
-
-A device can be selected explicitly:
-
-```python
-result = scale_similarity(I1, I2, use_gpu=True, device="cuda:0")
-```
-
-or
-
-```python
-result = scale_similarity(I1, I2, use_gpu=True, device="mps")
-```
+---
 
 ## Quick start
 
 ```python
-import numpy as np
+from astropy.io import fits
 from cdd_sva import scale_similarity
 
-# I1 and I2 are matched 2-D NumPy arrays.
-# NaNs may be used to mark invalid pixels.
-result = scale_similarity(I1, I2)
+I1 = fits.getdata("image1.fits").squeeze()
+I2 = fits.getdata("image2.fits").squeeze()
+
+result = scale_similarity(
+    I1,
+    I2,
+    use_gpu=False,
+    mode="log",
+)
+
+print("S_crit =", result.S_crit)
+print("CDD scales =", result.scales)
 
 S_pix = result.S_pix
-S_crit = result.S_crit
-scales = result.scales
 S_scale = result.S_scale
-
-print("S_crit =", S_crit)
 ```
 
-For compatibility with the original analysis-style interface, the first two
-outputs can also be unpacked directly:
+For compatibility with the original analysis-style interface, the first two outputs can also be unpacked directly:
 
 ```python
 S_pix, S_crit = scale_similarity(I1, I2)
@@ -104,14 +83,28 @@ S_pix, S_crit = scale_similarity(I1, I2)
 The scale-resolved outputs remain available through the result object:
 
 ```python
-result = scale_similarity(I1, I2)
-print(result.scales)
-print(result.S_scale)
+result.scales
+result.S_scale
 ```
 
-## Main parameters
+---
 
-The defaults reproduce the analysis choices used in the SVA methods paper.
+## Input requirements
+
+The two input images should be prepared before running SVA so that they have the same:
+
+1. 2-D array shape,
+2. celestial projection / WCS,
+3. pixel grid,
+4. effective angular resolution.
+
+Invalid pixels may be represented by `NaN`. Their original validity masks are preserved through the similarity calculation.
+
+CDD-SVA does **not** perform beam matching or reprojection internally. These operations are intentionally left outside the core package so that the inputs to the similarity calculation are explicit and reproducible.
+
+---
+
+## Main parameters
 
 ```python
 result = scale_similarity(
@@ -124,11 +117,14 @@ result = scale_similarity(
     percentile=95,
     seed=123,
 
+    # scale-wise quality filter
+    scale_rms_fraction=1e-4,
+
     # CDD scale sampling
     mode="log",
-    min_scale=1,
-    max_scale=None,
     num_channels=None,
+    max_scale=None,
+    min_scale=1,
     log_scale_base=2.0,
     linear_scale_step=None,
 
@@ -140,29 +136,30 @@ result = scale_similarity(
     # hardware
     use_gpu=False,
     device=None,
-
-    # scale-wise quality filter
-    scale_rms_fraction=1e-4,
 )
 ```
 
+The defaults reproduce the analysis choices used in the SVA methods paper.
+
 ### Scale sampling
 
-Logarithmic scales are the default:
+Logarithmic scale sampling is the default:
 
 ```python
 result = scale_similarity(
-    I1, I2,
+    I1,
+    I2,
     mode="log",
     log_scale_base=2.0,
 )
 ```
 
-Finer logarithmic sampling can be requested with a smaller base:
+A smaller logarithmic base gives finer scale sampling:
 
 ```python
 result = scale_similarity(
-    I1, I2,
+    I1,
+    I2,
     mode="log",
     log_scale_base=1.5,
 )
@@ -172,7 +169,8 @@ Linear scale sampling is also available:
 
 ```python
 result = scale_similarity(
-    I1, I2,
+    I1,
+    I2,
     mode="lin",
     min_scale=2,
     max_scale=128,
@@ -180,17 +178,64 @@ result = scale_similarity(
 )
 ```
 
-## Mathematical definition
+---
 
-CDD decomposes the two images into matched scale components,
+## GPU acceleration
+
+CDD supports GPU acceleration through PyTorch.
+
+For CUDA:
+
+```python
+result = scale_similarity(
+    I1,
+    I2,
+    use_gpu=True,
+    device="cuda",
+)
+```
+
+A specific CUDA device can be selected with, for example:
+
+```python
+result = scale_similarity(
+    I1,
+    I2,
+    use_gpu=True,
+    device="cuda:0",
+)
+```
+
+On supported Apple Silicon systems:
+
+```python
+result = scale_similarity(
+    I1,
+    I2,
+    use_gpu=True,
+    device="mps",
+)
+```
+
+Install a PyTorch build appropriate for your hardware before enabling GPU acceleration.
+
+---
+
+## Method
+
+CDD decomposes each image into matched spatial-scale components,
 
 \[
-\mathbf{A}(x,y) = [A_1(x,y), \ldots, A_N(x,y)],
-\qquad
-\mathbf{B}(x,y) = [B_1(x,y), \ldots, B_N(x,y)].
+\mathbf{A}(x,y) =
+[A_1(x,y), A_2(x,y), \ldots, A_N(x,y)],
 \]
 
-The pixel-wise similarity is the cosine alignment of the local scale vectors,
+\[
+\mathbf{B}(x,y) =
+[B_1(x,y), B_2(x,y), \ldots, B_N(x,y)].
+\]
+
+At each pixel, the component amplitudes define a local scale vector. The pixel-wise similarity is
 
 \[
 S_{\rm pix}(x,y)
@@ -203,78 +248,107 @@ S_{\rm pix}(x,y)
 }.
 \]
 
-At a fixed scale \(l_n\), the component maps are treated as spatial vectors,
+Thus, `S_pix` compares how the two images distribute their local intensity across scale rather than comparing their absolute normalization.
+
+At a fixed CDD scale \(l_n\), the two component maps are treated as spatial vectors,
 
 \[
 S_{\rm scale}(l_n)
 =
 \frac{
-\sum_{x,y}A_n(x,y)B_n(x,y)
+\sum_{x,y} A_n(x,y)B_n(x,y)
 }{
-\sqrt{\sum_{x,y}A_n^2(x,y)}
-\sqrt{\sum_{x,y}B_n^2(x,y)}
+\sqrt{\sum_{x,y} A_n^2(x,y)}
+\sqrt{\sum_{x,y} B_n^2(x,y)}
 }.
 \]
 
-For the default constrained decomposition of positive emission fields, both
-similarities naturally lie in `[0, 1]`. For signed component fields, CDD-SVA
-retains the natural cosine range `[-1, 1]`.
+For positive emission fields with constrained CDD, the similarities naturally lie in `[0, 1]`. For signed component fields, CDD-SVA retains the natural cosine range `[-1, 1]`.
+
+---
 
 ## Null calibration
 
-`S_crit` is obtained from random non-wrapping spatial shifts of the second CDD
-cube. The shifted validity mask is moved by the same offset. Valid pixel
-similarities from all realizations are pooled, and the requested percentile
-(default: 95th) defines the empirical reference threshold.
+High local similarity can occur by chance in structured images, so SVA estimates an empirical reference distribution using random non-wrapping spatial shifts of the second CDD cube.
 
-The pooled null pixels are spatially correlated; `S_crit` is therefore intended
-as an empirical reference threshold rather than a formal per-pixel p-value.
+The validity mask of the second image is shifted by the same offset. Valid pixel similarities from all shifted realizations are pooled, and the requested percentile of that distribution defines `S_crit`, with the default being the 95th percentile.
 
-## Example notebook
+The pooled null pixels are spatially correlated. `S_crit` is therefore used as an **empirical reference threshold**, not as a formal per-pixel p-value.
 
-`examples/example.ipynb` provides a worked OMC-1 example using two small,
-pre-matched FITS cutouts included in the repository:
+---
+
+## OMC-1 example
+
+A worked example is provided in:
 
 ```text
-examples/data/omc1_image1.fits   # H2 column density
-examples/data/omc1_image2.fits   # C18O(1-0) integrated intensity
+examples/example.ipynb
 ```
 
-Both images are 144 x 144 pixels, sampled on a 5 arcsec grid and matched to a
-36 arcsec effective resolution. The column-density cutout is derived from the
-Herschel/Planck Orion A product of Lombardi et al. (2014), and the C18O(1-0)
-cutout is derived from the CARMA-NRO Orion Survey product of Kong et al. (2018).
+The repository includes two small matched OMC-1 FITS cutouts:
 
-The notebook can be launched either from the repository root or from the
-`examples/` directory; it resolves the example-data path automatically.
+```text
+examples/data/omc1_image1.fits   H2 column density
+examples/data/omc1_image2.fits   C18O(1-0) integrated intensity
+```
 
-See `examples/data/README.md` for data provenance and preparation details.
+Both images are sampled on a **5 arcsec grid** and matched to a **36 arcsec effective resolution**.
+
+The H2 column-density cutout is derived from the Herschel/Planck Orion A product described by **Lombardi et al. (2014, A&A, 566, A45)**. The C18O(1-0) cutout is derived from the **CARMA-NRO Orion Survey** product described by **Kong et al. (2018, ApJS, 236, 25)**.
+
+To run the example:
+
+```bash
+jupyter notebook examples/example.ipynb
+```
+
+The notebook resolves the example-data path whether it is launched from the repository root or from the `examples/` directory.
+
+---
 
 ## Testing
+
+Install the development dependencies:
+
+```bash
+pip install -e ".[dev]"
+```
+
+Then run:
 
 ```bash
 pytest
 ```
 
-To verify that the package builds:
+The repository also includes a GitHub Actions workflow that runs the test suite automatically on supported Python versions.
+
+To verify that the package builds locally:
 
 ```bash
 python -m build
 twine check dist/*
 ```
 
+---
+
 ## Citation
 
-If you use CDD-SVA, please cite both the Scale-Vector Alignment methods paper
-and the original CDD paper:
+If you use Scale-Vector Alignment in scientific work, please cite both the SVA methods paper and the original CDD paper.
 
-- Zhao, M., Li, G.-X., Qiu, K., & Li, S., *Scale-Vector Alignment: A CDD-based
-  Framework for Spatially Resolved Morphological Similarity in Astronomical
-  Images*.
-- Li, G.-X. 2022, ApJS, 259, 59, doi:10.3847/1538-4365/ac4bc4.
+**Scale-Vector Alignment methods paper**
 
-See `CITATION.cff` for software citation metadata.
+Mengke Zhao, Guang-Xing Li, Keping Qiu, and Shanghuo Li,  
+*Scale-Vector Alignment: A CDD-based Framework for Spatially Resolved Morphological Similarity in Astronomical Images.*
+
+**CDD**
+
+Li, G.-X. 2022, *The Astrophysical Journal Supplement Series*, 259, 59.  
+DOI: `10.3847/1538-4365/ac4bc4`
+
+Software citation metadata are also provided in `CITATION.cff`.
+
+---
 
 ## License
 
-GNU General Public License v3.0. See `LICENSE`.
+This project is released under the **GNU General Public License v3.0 (GPL-3.0)**. See `LICENSE` for details.
