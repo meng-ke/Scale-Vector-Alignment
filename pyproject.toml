@@ -35,7 +35,6 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.23",
-    "torch",
     "constrained-diffusion>=1.2.5"
 ]
 
